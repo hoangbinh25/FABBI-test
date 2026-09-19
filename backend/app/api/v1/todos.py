@@ -23,6 +23,14 @@ router = APIRouter()
 CACHE_TTL = 300  # 5 minutes
 
 
+def ensure_todo_owner(todo, current_user: User):
+    if todo.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Todo not found",
+        )
+
+
 @router.get("", response_model=TodoListResponse)
 async def list_todos(
     page: int = Query(1, ge=1),
@@ -98,6 +106,7 @@ async def get_todo(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Todo not found",
         )
+    ensure_todo_owner(todo, current_user)
 
     return todo
 
@@ -117,6 +126,7 @@ async def update_existing_todo(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Todo not found",
         )
+    ensure_todo_owner(todo, current_user)
 
     update_data = todo_data.model_dump()
 
@@ -148,6 +158,7 @@ async def delete_existing_todo(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Todo not found",
         )
+    ensure_todo_owner(todo, current_user)
 
     await delete_todo(db, todo)
 

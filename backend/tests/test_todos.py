@@ -120,3 +120,42 @@ async def test_get_single_todo(client: AsyncClient):
     assert response.status_code == 200
     data = response.json()
     assert data["title"] == "Single Todo"
+
+
+@pytest.mark.asyncio
+async def test_user_cannot_read_another_users_todo(client: AsyncClient):
+    """Users must not access todos owned by another user."""
+    owner_token = await get_auth_token(client, "owner@example.com")
+    other_user_token = await get_auth_token(client, "other@example.com")
+
+    create_response = await client.post(
+        "/api/v1/todos",
+        json={"title": "Private Todo"},
+        headers={"Authorization": f"Bearer {owner_token}"},
+    )
+    todo_id = create_response.json()["id"]
+
+    response = await client.get(
+        f"/api/v1/todos/{todo_id}",
+        headers={"Authorization": f"Bearer {other_user_token}"},
+    )
+
+    assert response.status_code == 404
+
+
+@pytest.mark.parametrize("method", ["put", "delete"])
+async def test_user_cannot_modify_another_users_todo(client: AsyncClient, method):
+    owner = {
+        "Authorization": f"Bearer {await get_auth_token(client, 'owner@example.com')}"
+    }
+    other = {
+        "Authorization": f"Bearer {await get_auth_token(client, 'other@example.com')}"
+    }
+    created = await client.post(
+        "/api/v1/todos", headers=owner, json={"title": "Private"}
+    )
+    url = f"/api/v1/todos/{created.json()['id']}"
+    kwargs = {"json": {"title": "Stolen"}} if method == "put" else {}
+    response = await client.request(method, url, headers=other, **kwargs)
+    assert response.status_code == 404
+    assert (await client.get(url, headers=owner)).json()["title"] == "Private"

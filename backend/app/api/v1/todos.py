@@ -21,6 +21,16 @@ from app.services.todo_service import (
 router = APIRouter()
 
 CACHE_TTL = 300  # 5 minutes
+CACHE_KEY_PREFIX = "todos:list"
+
+
+def todo_cache_key(user_id: uuid.UUID, version: str, page: int, size: int) -> str:
+    return f"{CACHE_KEY_PREFIX}:{user_id}:{version}:{page}:{size}"
+
+
+async def invalidate_todo_cache(redis: RedisClient, user_id: uuid.UUID) -> None:
+    # Rotate after commit; an in-flight read can only refill its old namespace.
+    await redis.set(f"{CACHE_KEY_PREFIX}:{user_id}:version", str(uuid.uuid4()))
 
 
 def ensure_todo_owner(todo, current_user: User):
@@ -42,7 +52,8 @@ async def list_todos(
     """Get paginated list of todos."""
     skip = (page - 1) * size
 
-    cache_key = "todos:list"
+    version = await redis.get(f"{CACHE_KEY_PREFIX}:{current_user.id}:version") or "0"
+    cache_key = todo_cache_key(current_user.id, version, page, size)
 
     # Try to get from cache
     cached = await redis.get(cache_key)
@@ -87,9 +98,12 @@ async def create_new_todo(
     todo_data: TodoCreate,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    redis: RedisClient = Depends(get_redis),
 ):
     """Create a new todo item."""
     todo = await create_todo(db, todo_data, current_user.id)
+    await db.commit()
+    await invalidate_todo_cache(redis, current_user.id)
     return todo
 
 
@@ -140,6 +154,8 @@ async def update_existing_todo(
         todo.description = update_data["description"]
 
     updated_todo = await update_todo(db, todo, {})
+    await db.commit()
+    await invalidate_todo_cache(redis, current_user.id)
 
     return updated_todo
 
@@ -161,5 +177,7 @@ async def delete_existing_todo(
     ensure_todo_owner(todo, current_user)
 
     await delete_todo(db, todo)
+    await db.commit()
+    await invalidate_todo_cache(redis, current_user.id)
 
     return None

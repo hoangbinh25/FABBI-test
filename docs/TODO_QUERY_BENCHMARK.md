@@ -84,11 +84,15 @@ index.
 ## Reproduction
 
 ```bash
-docker compose exec -T -e SEED_USERS=10000 -e SEED_TODOS=1000000 backend \
+docker compose exec -T \
+  -e DATABASE_URL=postgresql+asyncpg://fabbi:<password>@postgres:5432/<benchmark_db> \
+  -e SEED_USERS=10000 -e SEED_TODOS=1000000 backend \
   python -m app.db.seed
 
 docker compose exec -T postgres psql -U fabbi -d <benchmark_db> \
   -c "EXPLAIN (ANALYZE, BUFFERS) <query>"
 
-docker compose exec -T backend alembic upgrade head
+docker compose exec -T \
+  -e DATABASE_URL=postgresql+asyncpg://fabbi:<password>@postgres:5432/<benchmark_db> \
+  backend alembic upgrade head
 ```

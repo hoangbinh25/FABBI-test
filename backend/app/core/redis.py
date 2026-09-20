@@ -34,5 +34,8 @@ class RedisClient:
     async def exists(self, key: str) -> bool:
         return await self._redis.exists(key)
 
+    async def incr(self, key: str) -> int:
+        return await self._redis.incr(key)
+
 
 redis_client = RedisClient()

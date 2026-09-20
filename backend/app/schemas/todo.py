@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime
 
 from pydantic import BaseModel, Field
+from app.schemas.tag import TagResponse
 
 
 class TodoCreate(BaseModel):
@@ -24,6 +25,7 @@ class TodoResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     user_email: str | None = None
+    tags: list[TagResponse] = []
 
     model_config = {"from_attributes": True}
 
@@ -33,3 +35,8 @@ class TodoListResponse(BaseModel):
     total: int
     page: int
     size: int
+
+
+class BulkStatusUpdate(BaseModel):
+    todo_ids: list[uuid.UUID] = Field(..., min_length=1, max_length=100)
+    completed: bool

@@ -79,6 +79,29 @@ async def test_update_todo(client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_partial_update_preserves_description_and_can_mark_active(client: AsyncClient):
+    token = await get_auth_token(client, "partial-update@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+    created = await client.post(
+        "/api/v1/todos",
+        json={"title": "Original", "description": "Keep this"},
+        headers=headers,
+    )
+    todo_id = created.json()["id"]
+
+    await client.put(f"/api/v1/todos/{todo_id}", json={"completed": True}, headers=headers)
+    response = await client.put(
+        f"/api/v1/todos/{todo_id}",
+        json={"title": "Renamed", "completed": False},
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["completed"] is False
+    assert response.json()["description"] == "Keep this"
+
+
+@pytest.mark.asyncio
 async def test_delete_todo(client: AsyncClient):
     """Test deleting a todo."""
     token = await get_auth_token(client, "delete@example.com")

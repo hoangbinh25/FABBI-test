@@ -2,7 +2,6 @@ import json
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_redis
@@ -63,22 +62,19 @@ async def list_todos(
 
     todos, total = await get_todos(db, user_id=current_user.id, skip=skip, limit=size)
 
-    items = []
-    for todo in todos:
-        user_result = await db.execute(select(User).where(User.id == todo.user_id))
-        user = user_result.scalar_one_or_none()
-        items.append(
-            TodoResponse(
-                id=todo.id,
-                title=todo.title,
-                description=todo.description,
-                completed=todo.completed,
-                user_id=todo.user_id,
-                created_at=todo.created_at,
-                updated_at=todo.updated_at,
-                user_email=user.email if user else None,
-            )
+    items = [
+        TodoResponse(
+            id=todo.id,
+            title=todo.title,
+            description=todo.description,
+            completed=todo.completed,
+            user_id=todo.user_id,
+            created_at=todo.created_at,
+            updated_at=todo.updated_at,
+            user_email=current_user.email,
         )
+        for todo in todos
+    ]
 
     response = TodoListResponse(
         items=items,
@@ -142,16 +138,9 @@ async def update_existing_todo(
         )
     ensure_todo_owner(todo, current_user)
 
-    update_data = todo_data.model_dump()
-
-    if todo_data.completed:
-        todo.completed = todo_data.completed
-
-    # Apply other updates
-    if update_data.get("title") is not None:
-        todo.title = update_data["title"]
-    if "description" in update_data:
-        todo.description = update_data["description"]
+    update_data = todo_data.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(todo, field, value)
 
     updated_todo = await update_todo(db, todo, {})
     await db.commit()

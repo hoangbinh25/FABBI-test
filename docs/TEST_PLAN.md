@@ -1,54 +1,144 @@
-# Manual Test Plan — Authentication, Authorization, Todo and Cache Regression
+# Manual Test Plan
 
-## 1. Scope and objective
+## Scope
 
-This plan covers authentication, authorization boundaries, todo CRUD, browser-session cleanup, and cache correctness for the Tier 1 and Tier 2 changes. It is intended for manual execution against the Docker Compose environment.
+Manual regression coverage for authentication, authorization, todo CRUD, and cache isolation.
 
-## 2. Environment and prerequisites
+## Environment
 
 | Item | Value |
 | --- | --- |
 | Frontend | `http://localhost:3000` |
-| Backend API / Swagger | `http://localhost:8000` / `http://localhost:8000/docs` |
-| Browser | Latest Chrome or Chromium, with DevTools available |
-| Services | Run `docker compose up --build` from the repository root |
-| Accounts | Create two unique accounts during testing: User A and User B |
-| Seed data | Not required; each case creates its own todo data |
+| API / Swagger | `http://localhost:8000` / `http://localhost:8000/docs` |
+| Services | `docker compose up --build` from repository root |
+| Accounts | Create User A and User B with separate browser sessions |
 
-Use a normal browser window for User A and an incognito window (or separate browser profile) for User B when the case requires concurrent sessions.
+Use a normal browser session for User A and an incognito session for User B.
 
-## 3. Test cases
+## Authentication
 
-| ID | Module | Scenario | Preconditions | Steps | Expected result | Actual result | Priority | Severity | Status |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| AUTH-01 | Authentication | Register a new account | App is running; email has not been registered | 1. Open `/register`.<br>2. Enter valid email, password, and matching confirmation.<br>3. Click **Create Account**. | API returns 201; browser moves to Todo page; displayed email matches the new account. | Not run | P0 | Critical | Not run |
-| AUTH-02 | Authentication | Reject an invalid password | A registered account exists | 1. Open `/login`.<br>2. Enter the account email with an incorrect password.<br>3. Click **Sign In**. | Login remains on the page; user sees an authentication error; no access or refresh tokens are stored. | Not run | P0 | High | Not run |
-| AUTH-03 | Authentication | Logout clears the browser session | User A is logged in and has at least one todo visible | 1. Click **Logout**.<br>2. Verify redirect to `/login`.<br>3. In DevTools Application/Storage, inspect local storage.<br>4. Navigate to `/`. | User is on login page; `access_token` and `refresh_token` are absent; protected route does not render A's todos. | Not run | P0 | High | Not run |
-| AUTH-04 | Authentication | A 401 clears the browser session | User A is logged in | 1. In DevTools, replace `access_token` with invalid text.<br>2. Refresh or trigger a protected request.<br>3. Inspect local storage. | Browser redirects to `/login`; both tokens are removed; prior profile/todo data does not remain visible. | Not run | P1 | High | Not run |
-| AUTHZ-01 | Authorization | User B cannot read A's todo by ID | A and B exist; A created todo X | 1. Obtain X's UUID from DevTools Network or Swagger.<br>2. Log in as B.<br>3. In Swagger authorize with B's token and call `GET /api/v1/todos/{X}`. | HTTP 404; response does not expose X's title or description. | Not run | P0 | Critical | Not run |
-| AUTHZ-02 | Authorization | User B cannot update A's todo | Same as AUTHZ-01 | 1. As B call `PUT /api/v1/todos/{X}` with a different title.<br>2. As A reload the todo. | B receives HTTP 404; A's title and all fields are unchanged. | Not run | P0 | Critical | Not run |
-| AUTHZ-03 | Authorization | User B cannot delete A's todo | Same as AUTHZ-01 | 1. As B call `DELETE /api/v1/todos/{X}`.<br>2. As A reload the todo list. | B receives HTTP 404; X remains in A's list. | Not run | P0 | Critical | Not run |
-| TODO-01 | Todo CRUD | Create, edit, then delete a todo | User A is logged in | 1. Create a todo with title and description.<br>2. Confirm it appears.<br>3. Edit title.<br>4. Delete it.<br>5. Refresh after every operation. | Each confirmed change persists after refresh; deleted item does not return. | Not run | P0 | High | Not run |
-| TODO-02 | Todo status | Mark a todo complete | User A has an active todo | 1. Click the todo checkbox.<br>2. Confirm strike-through/completed UI.<br>3. Refresh. | Todo remains completed after refresh. | Not run | P1 | Medium | Not run |
-| TODO-03 | Todo status regression | Mark a completed todo active | User A has a completed todo | 1. Click the completed todo checkbox again.<br>2. Refresh. | Expected: todo remains active (`completed=false`) after refresh.<br>Known current limitation: source has not yet fixed this behavior; record observed result as a defect if it reverts. | Not run | P1 | Medium | Not run |
-| TODO-04 | Partial update regression | Change title without losing description | User A has a todo with a non-empty description | 1. Open edit.<br>2. Change title only and save.<br>3. Refresh. | Expected: description is retained.<br>Known current limitation: source has not yet fixed this behavior; record observed result as a defect if description clears. | Not run | P1 | Medium | Not run |
-| CACHE-01 | Backend cache | A and B list data remains isolated | A and B have distinct todos | 1. As A load list and refresh once.<br>2. As B log in in separate session and load list.<br>3. Repeat in reverse order. | Each user sees only their own todos; no title from the other user appears. | Not run | P0 | Critical | Not run |
-| CACHE-02 | Backend cache | Create invalidates cached list | User A is logged in; load list once | 1. Create a new todo.<br>2. Reload the page. | New todo appears immediately and after reload. | Not run | P1 | High | Not run |
-| CACHE-03 | Backend cache | Update/delete invalidates cached list | User A has a todo and has loaded the list | 1. Update its title, reload.<br>2. Delete it, reload. | Updated title persists; deleted item does not reappear. | Not run | P1 | High | Not run |
-| CACHE-04 | Frontend cache | Switching accounts clears React Query data | A has a visible todo; B has none | 1. Log in as A and wait for list.<br>2. Logout.<br>3. Log in as B in the same tab. | A's email and todo never appear in B's session, including while B's request is loading. | Not run | P0 | High | Not run |
+### AUTH-01 — Register a new account
 
-## 4. Defect reporting format
+- **Priority / Severity:** P0 / Critical
+- **Preconditions:** App is running; email has not been registered.
+- **Steps:** Open `/register`, enter valid credentials, then submit.
+- **Expected:** API returns `201`; browser opens the todo page and displays the account email.
+- **Actual / Status:** Not run.
 
-For a failed manual case, record:
+### AUTH-02 — Reject an invalid password
 
-- Test case ID and execution date/time.
-- Account and todo UUID used, without recording passwords or token values.
-- Actual response status/body (redact access and refresh tokens).
-- Screenshot, browser console output, and relevant Network request.
-- Severity/priority confirmed by the test owner and reproduction steps.
+- **Priority / Severity:** P0 / High
+- **Preconditions:** A registered account exists.
+- **Steps:** Open `/login`, enter that email and an invalid password, then submit.
+- **Expected:** Login remains unavailable; an authentication error appears and no tokens are stored.
+- **Actual / Status:** Not run.
 
-## 5. Known limitations at the time of writing
+### AUTH-03 — Logout clears the browser session
 
-- JWT expiration validation is outside the current Tier 1 patch; a manually created expired token should be treated as a known defect until fixed.
-- `completed: true` to `false` and preserving description during title-only updates are tracked by TODO-03 and TODO-04 as known source limitations.
-- The current UI has no pagination controls. Pagination/cache parameters can be verified through Swagger or browser Network requests.
+- **Priority / Severity:** P0 / High
+- **Preconditions:** User A is logged in and has a visible todo.
+- **Steps:** Click **Logout**; inspect local storage; navigate to `/`.
+- **Expected:** Both tokens are removed and protected routes do not render User A data.
+- **Actual / Status:** Not run.
+
+### AUTH-04 — Invalid or expired token clears the session
+
+- **Priority / Severity:** P1 / High
+- **Preconditions:** User A is logged in.
+- **Steps:** Replace `access_token` with invalid text in DevTools, then refresh.
+- **Expected:** Browser redirects to `/login`; both tokens and cached user data are cleared.
+- **Actual / Status:** Not run.
+
+## Authorization
+
+### AUTHZ-01 — User B cannot read User A's todo
+
+- **Priority / Severity:** P0 / Critical
+- **Preconditions:** User A created todo X; User B is logged in separately.
+- **Steps:** In Swagger, authorize as B and call `GET /api/v1/todos/{X}`.
+- **Expected:** `404`; title and description of X are not exposed.
+- **Actual / Status:** Not run.
+
+### AUTHZ-02 — User B cannot update User A's todo
+
+- **Priority / Severity:** P0 / Critical
+- **Preconditions:** Same as AUTHZ-01.
+- **Steps:** As B, call `PUT /api/v1/todos/{X}` with a new title; reload as A.
+- **Expected:** B receives `404`; A's todo is unchanged.
+- **Actual / Status:** Not run.
+
+### AUTHZ-03 — User B cannot delete User A's todo
+
+- **Priority / Severity:** P0 / Critical
+- **Preconditions:** Same as AUTHZ-01.
+- **Steps:** As B, call `DELETE /api/v1/todos/{X}`; reload A's list.
+- **Expected:** B receives `404`; X remains in A's list.
+- **Actual / Status:** Not run.
+
+## Todo behavior
+
+### TODO-01 — Create, edit, and delete a todo
+
+- **Priority / Severity:** P0 / High
+- **Preconditions:** User A is logged in.
+- **Steps:** Create with title and description; edit its title; delete it; refresh after each operation.
+- **Expected:** Each change persists; deleted todo does not return.
+- **Actual / Status:** Not run.
+
+### TODO-02 — Toggle completed both directions
+
+- **Priority / Severity:** P1 / Medium
+- **Preconditions:** User A has an active todo.
+- **Steps:** Mark it completed; refresh; mark it active again; refresh.
+- **Expected:** The `completed` value persists as `true`, then as `false`.
+- **Actual / Status:** Not run.
+
+### TODO-03 — Partial update preserves description
+
+- **Priority / Severity:** P1 / Medium
+- **Preconditions:** User A has a todo with a non-empty description.
+- **Steps:** Edit only the title and save; refresh.
+- **Expected:** New title is saved and description is unchanged.
+- **Actual / Status:** Not run.
+
+## Cache regression
+
+### CACHE-01 — Todo lists are isolated by user
+
+- **Priority / Severity:** P0 / Critical
+- **Preconditions:** A and B have different todos.
+- **Steps:** Load A's list twice; load B's list in a second session; repeat in reverse order.
+- **Expected:** Each account sees only its own todos.
+- **Actual / Status:** Not run.
+
+### CACHE-02 — Create invalidates cached lists
+
+- **Priority / Severity:** P1 / High
+- **Preconditions:** User A loaded an empty list.
+- **Steps:** Create a todo, then reload.
+- **Expected:** New todo appears immediately and after reload.
+- **Actual / Status:** Not run.
+
+### CACHE-03 — Update and delete invalidate cached lists
+
+- **Priority / Severity:** P1 / High
+- **Preconditions:** User A has loaded a list containing a todo.
+- **Steps:** Update title and reload; delete todo and reload.
+- **Expected:** Updated title persists; deleted todo does not reappear.
+- **Actual / Status:** Not run.
+
+### CACHE-04 — Switching accounts clears React Query data
+
+- **Priority / Severity:** P0 / High
+- **Preconditions:** A has a visible todo; B has none.
+- **Steps:** Login as A, logout, then login as B in the same tab.
+- **Expected:** A's email and todos never appear during B's session, including loading state.
+- **Actual / Status:** Not run.
+
+## Defect report template
+
+- Test case ID and execution time.
+- Account and todo UUID; never include passwords or token values.
+- Actual HTTP status/body with tokens redacted.
+- Screenshot, console output, and relevant Network request.
+- Confirmed priority, severity, and reproduction steps.

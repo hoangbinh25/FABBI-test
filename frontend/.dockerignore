@@ -1,0 +1,13 @@
+.git
+.env
+.env.*
+node_modules/
+venv/
+.venv/
+test.db
+dist/
+coverage/
+.vite/
+playwright-report/
+test-results/
+*.log

@@ -11,9 +11,10 @@ export interface Todo {
   user_id: string;
   created_at: string;
   updated_at: string;
+  tags: { id: string; name: string; color: string | null }[];
 }
 
-interface TodoListResponse {
+export interface TodoListResponse {
   items: Todo[];
   total: number;
   page: number;
@@ -25,6 +26,8 @@ interface CreateTodoRequest {
   description?: string;
 }
 
+export interface TodoFilters { status?: "active" | "completed"; tag_id?: string; keyword?: string; date_from?: string; date_to?: string; }
+
 interface UpdateTodoRequest {
   title?: string;
   description?: string;
@@ -32,16 +35,24 @@ interface UpdateTodoRequest {
 }
 
 
-export function useTodos(page: number = 1, size: number = 10000) {
+export function useTodos(filters: TodoFilters = {}, page: number = 1, size: number = 100) {
   return useQuery({
-    queryKey: ["todos", page, size],
+    queryKey: ["todos", filters, page, size],
     queryFn: async ({ signal }): Promise<TodoListResponse> => {
       const response = await api.get("/todos", {
-        params: { page, size },
+        params: { ...filters, page, size },
         signal,
       });
       return response.data;
     },
+  });
+}
+
+export function useBulkStatus() {
+  return useMutation({
+    mutationFn: async ({ ids, completed }: { ids: string[]; completed: boolean }) => (await api.patch("/todos/bulk-status", { todo_ids: ids, completed })).data,
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["todos"] }); toast.success("Todos updated"); },
+    onError: () => toast.error("Failed to update todos"),
   });
 }
 
@@ -73,6 +84,25 @@ export function useUpdateTodo() {
     }): Promise<Todo> => {
       const response = await api.put(`/todos/${id}`, data);
       return response.data;
+    },
+    onMutate: async ({ id, data }) => {
+      // Cancel outgoing queries
+      await queryClient.cancelQueries({ queryKey: ["todos"] });
+
+      // Snapshot previous value
+      const previousTodos = queryClient.getQueryData<TodoListResponse>(["todos"]);
+
+      // Optimistically update
+      if (previousTodos) {
+        queryClient.setQueryData<TodoListResponse>(["todos"], {
+          ...previousTodos,
+          items: previousTodos.items.map((todo) =>
+            todo.id === id ? { ...todo, ...data } : todo
+          ),
+        });
+      }
+
+      return { previousTodos };
     },
     onError: () => {
       toast.error("Failed to update todo");

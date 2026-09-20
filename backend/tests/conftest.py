@@ -61,10 +61,16 @@ def redis_cache():
     async def set_value(key, value, ex=None):
         values[key] = value
 
+    async def incr(key):
+        value = int(values.get(key, "0")) + 1
+        values[key] = str(value)
+        return value
+
     mock_redis = MagicMock()
     mock_redis.get = AsyncMock(side_effect=get)
     mock_redis.set = AsyncMock(side_effect=set_value)
     mock_redis.delete = AsyncMock()
+    mock_redis.incr = AsyncMock(side_effect=incr)
     app.dependency_overrides[get_redis] = lambda: mock_redis
     yield mock_redis
     app.dependency_overrides.pop(get_redis, None)

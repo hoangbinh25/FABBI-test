@@ -3,12 +3,18 @@ import { TodoItem } from "./TodoItem";
 import { TodoForm } from "./TodoForm";
 import type { Todo } from "../api/todos";
 import { useDeleteTodo, useToggleTodo } from "../api/todos";
+import type { Tag } from "../api/tags";
 
 interface TodoListProps {
   todos: Todo[];
+  selected: Set<string>;
+  onSelect: (id: string) => void;
+  tags: Tag[];
+  onAttachTag: (todoId: string, tagId: string) => void;
+  onDetachTag: (todoId: string, tagId: string) => void;
 }
 
-export function TodoList({ todos }: TodoListProps) {
+export function TodoList({ todos, selected, onSelect, tags, onAttachTag, onDetachTag }: TodoListProps) {
   const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
   const deleteTodo = useDeleteTodo();
   const toggleTodo = useToggleTodo();
@@ -45,6 +51,7 @@ export function TodoList({ todos }: TodoListProps) {
             onToggle={handleToggle}
             onEdit={handleEdit}
             onDelete={handleDelete}
+            selected={selected.has(todo.id)} onSelect={onSelect} tags={tags} onAttachTag={onAttachTag} onDetachTag={onDetachTag}
           />
         ))}
       </div>

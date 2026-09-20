@@ -1,14 +1,14 @@
 """add tags, todo-tag mapping, and filtered todo index
 
 Revision ID: b4e7c8d9f012
-Revises: a0790c76a129
+Revises: 3c1f2e4d5a6b
 """
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 revision = "b4e7c8d9f012"
-down_revision = "a0790c76a129"
+down_revision = "3c1f2e4d5a6b"
 branch_labels = None
 depends_on = None
 

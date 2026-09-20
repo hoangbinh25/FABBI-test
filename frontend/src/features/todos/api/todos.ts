@@ -38,9 +38,10 @@ interface UpdateTodoRequest {
 export function useTodos(filters: TodoFilters = {}, page: number = 1, size: number = 100) {
   return useQuery({
     queryKey: ["todos", filters, page, size],
-    queryFn: async (): Promise<TodoListResponse> => {
+    queryFn: async ({ signal }): Promise<TodoListResponse> => {
       const response = await api.get("/todos", {
         params: { ...filters, page, size },
+        signal,
       });
       return response.data;
     },

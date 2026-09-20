@@ -7,6 +7,7 @@ venv/
 
 # Environment
 # .env
+/.env.production
 *.env.local
 
 # IDE
@@ -21,6 +22,8 @@ build/
 test.db
 .pytest_cache/
 .coverage
+e2e/playwright-report/
+e2e/test-results/
 
 # Docker
 postgres_data/

@@ -20,7 +20,7 @@ CACHE_TTL = 300
 
 
 async def invalidate(redis: RedisClient, user_id: uuid.UUID) -> None:
-    await redis.incr(f"todos:version:{user_id}")
+    await redis.set(f"todos:list:{user_id}:version", str(uuid.uuid4()))
 
 
 async def owned_todo(todo_id: uuid.UUID, user_id: uuid.UUID, db: AsyncSession) -> Todo:
@@ -34,7 +34,7 @@ async def owned_todo(todo_id: uuid.UUID, user_id: uuid.UUID, db: AsyncSession) -
 @router.get("", response_model=TodoListResponse)
 async def list_todos(page: int = Query(1, ge=1), size: int = Query(20, ge=1, le=100), status_filter: str | None = Query(None, alias="status", pattern="^(active|completed)$"), tag_id: uuid.UUID | None = None, keyword: str | None = Query(None, max_length=200), date_from: datetime | None = None, date_to: datetime | None = None, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db), redis: RedisClient = Depends(get_redis)):
     filters = {"page": page, "size": size, "status": status_filter, "tag": str(tag_id) if tag_id else None, "keyword": keyword, "from": date_from.isoformat() if date_from else None, "to": date_to.isoformat() if date_to else None}
-    version = await redis.get(f"todos:version:{current_user.id}") or "0"
+    version = await redis.get(f"todos:list:{current_user.id}:version") or "0"
     cache_key = f"todos:list:{current_user.id}:{version}:{json.dumps(filters, sort_keys=True, separators=(',', ':'))}"
     cached = await redis.get(cache_key)
     if cached:
@@ -56,7 +56,7 @@ async def list_todos(page: int = Query(1, ge=1), size: int = Query(20, ge=1, le=
 @router.post("", response_model=TodoResponse, status_code=status.HTTP_201_CREATED)
 async def create_new_todo(data: TodoCreate, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db), redis: RedisClient = Depends(get_redis)):
     todo = Todo(title=data.title, description=data.description, user_id=current_user.id)
-    db.add(todo); await db.flush(); await db.refresh(todo); await invalidate(redis, current_user.id)
+    db.add(todo); await db.flush(); await db.refresh(todo); await db.commit(); await invalidate(redis, current_user.id)
     return todo
 
 
@@ -66,7 +66,7 @@ async def bulk_status(data: BulkStatusUpdate, current_user: User = Depends(get_c
     if len(todos) != len(set(data.todo_ids)):
         raise HTTPException(status_code=404, detail="One or more todos were not found")
     for todo in todos: todo.completed = data.completed
-    await db.flush(); await invalidate(redis, current_user.id)
+    await db.flush(); await db.commit(); await invalidate(redis, current_user.id)
     return todos
 
 
@@ -76,7 +76,7 @@ async def attach_tag(todo_id: uuid.UUID, tag_id: uuid.UUID, current_user: User =
     tag = (await db.execute(select(Tag).where(Tag.id == tag_id, Tag.user_id == current_user.id))).scalar_one_or_none()
     if not tag: raise HTTPException(status_code=404, detail="Tag not found")
     if tag not in todo.tags: todo.tags.append(tag)
-    await db.flush(); await invalidate(redis, current_user.id)
+    await db.flush(); await db.commit(); await invalidate(redis, current_user.id)
     return todo
 
 
@@ -85,7 +85,7 @@ async def detach_tag(todo_id: uuid.UUID, tag_id: uuid.UUID, current_user: User =
     todo = await owned_todo(todo_id, current_user.id, db)
     tag = next((tag for tag in todo.tags if tag.id == tag_id), None)
     if not tag: raise HTTPException(status_code=404, detail="Tag mapping not found")
-    todo.tags.remove(tag); await db.flush(); await invalidate(redis, current_user.id)
+    todo.tags.remove(tag); await db.flush(); await db.commit(); await invalidate(redis, current_user.id)
 
 
 @router.get("/{todo_id}", response_model=TodoResponse)
@@ -97,11 +97,11 @@ async def get_todo(todo_id: uuid.UUID, current_user: User = Depends(get_current_
 async def update_existing_todo(todo_id: uuid.UUID, data: TodoUpdate, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db), redis: RedisClient = Depends(get_redis)):
     todo = await owned_todo(todo_id, current_user.id, db)
     for key, value in data.model_dump(exclude_unset=True).items(): setattr(todo, key, value)
-    await db.flush(); await db.refresh(todo); await invalidate(redis, current_user.id)
+    await db.flush(); await db.refresh(todo); await db.commit(); await invalidate(redis, current_user.id)
     return todo
 
 
 @router.delete("/{todo_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_existing_todo(todo_id: uuid.UUID, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db), redis: RedisClient = Depends(get_redis)):
     todo = await owned_todo(todo_id, current_user.id, db)
-    await db.delete(todo); await db.flush(); await invalidate(redis, current_user.id)
+    await db.delete(todo); await db.flush(); await db.commit(); await invalidate(redis, current_user.id)

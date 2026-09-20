@@ -17,7 +17,7 @@ router = APIRouter()
 
 async def invalidate_todos(redis: RedisClient, user_id: uuid.UUID) -> None:
     """Rotate this user's todo-list cache namespace after a tag mutation."""
-    await redis.incr(f"todos:version:{user_id}")
+    await redis.incr(f"todos:list:{user_id}:version")
 
 
 async def owned_tag(tag_id: uuid.UUID, user_id: uuid.UUID, db: AsyncSession) -> Tag:

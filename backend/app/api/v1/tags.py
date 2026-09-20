@@ -17,7 +17,7 @@ router = APIRouter()
 
 async def invalidate_todos(redis: RedisClient, user_id: uuid.UUID) -> None:
     """Rotate this user's todo-list cache namespace after a tag mutation."""
-    await redis.incr(f"todos:list:{user_id}:version")
+    await redis.set(f"todos:list:{user_id}:version", str(uuid.uuid4()))
 
 
 async def owned_tag(tag_id: uuid.UUID, user_id: uuid.UUID, db: AsyncSession) -> Tag:
@@ -33,7 +33,11 @@ async def list_tags(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    statement = select(Tag).where(Tag.user_id == current_user.id).order_by(func.lower(Tag.name))
+    statement = (
+        select(Tag)
+        .where(Tag.user_id == current_user.id)
+        .order_by(func.lower(Tag.name))
+    )
     return (await db.execute(statement)).scalars().all()
 
 
@@ -49,7 +53,10 @@ async def create_tag(
     try:
         await db.flush()
     except IntegrityError as error:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="A tag with this name already exists") from error
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A tag with this name already exists",
+        ) from error
 
     await invalidate_todos(redis, current_user.id)
     return tag
@@ -70,7 +77,10 @@ async def update_tag(
     try:
         await db.flush()
     except IntegrityError as error:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="A tag with this name already exists") from error
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A tag with this name already exists",
+        ) from error
 
     await invalidate_todos(redis, current_user.id)
     return tag

@@ -21,7 +21,12 @@ interface TagEditDialogProps {
 
 export function TagEditDialog({ tag, onClose }: TagEditDialogProps) {
   const updateTag = useUpdateTag();
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<TagFormData>({
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<TagFormData>({
     resolver: zodResolver(tagSchema),
   });
 
@@ -40,20 +45,28 @@ export function TagEditDialog({ tag, onClose }: TagEditDialogProps) {
   return (
     <Dialog open={tag !== null} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-md">
-        <DialogHeader><DialogTitle>Edit tag</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>Edit tag</DialogTitle>
+        </DialogHeader>
         <form className="space-y-4" onSubmit={handleSubmit(submit)}>
           <div className="space-y-2">
             <Label htmlFor="tag-name">Name</Label>
             <Input id="tag-name" {...register("name")} />
-            {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
+            {errors.name && (
+              <p className="text-sm text-destructive">{errors.name.message}</p>
+            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="tag-color">Color (optional)</Label>
             <Input id="tag-color" placeholder="#dbeafe" {...register("color")} />
           </div>
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-            <Button type="submit" disabled={updateTag.isPending}>Save</Button>
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={updateTag.isPending}>
+              Save
+            </Button>
           </div>
         </form>
       </DialogContent>

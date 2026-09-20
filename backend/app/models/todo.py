@@ -53,7 +53,12 @@ class Todo(Base):
         back_populates="todos",
         lazy="select",
     )
-    tags = relationship("Tag", secondary=todo_tags, back_populates="todos", lazy="selectin")
+    tags = relationship(
+        "Tag",
+        secondary=todo_tags,
+        back_populates="todos",
+        lazy="selectin",
+    )
 
     def __repr__(self) -> str:
         return f"<Todo {self.title}>"

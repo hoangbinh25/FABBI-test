@@ -38,7 +38,11 @@ class User(Base):
         back_populates="user",
         lazy="select",
     )
-    tags: Mapped[list["Tag"]] = relationship("Tag", lazy="selectin", cascade="all, delete-orphan")
+    tags: Mapped[list["Tag"]] = relationship(
+        "Tag",
+        lazy="selectin",
+        cascade="all, delete-orphan",
+    )
 
     def __repr__(self) -> str:
         return f"<User {self.email}>"

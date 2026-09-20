@@ -1,9 +1,8 @@
 import { useState } from "react";
-import { TodoItem } from "./TodoItem";
-import { TodoForm } from "./TodoForm";
-import type { Todo } from "../api/todos";
-import { useDeleteTodo, useToggleTodo } from "../api/todos";
 import type { Tag } from "../api/tags";
+import { useDeleteTodo, useToggleTodo, type Todo } from "../api/todos";
+import { TodoForm } from "./TodoForm";
+import { TodoItem } from "./TodoItem";
 
 interface TodoListProps {
   todos: Todo[];
@@ -14,28 +13,23 @@ interface TodoListProps {
   onDetachTag: (todoId: string, tagId: string) => void;
 }
 
-export function TodoList({ todos, selected, onSelect, tags, onAttachTag, onDetachTag }: TodoListProps) {
+export function TodoList({
+  todos,
+  selected,
+  onSelect,
+  tags,
+  onAttachTag,
+  onDetachTag,
+}: TodoListProps) {
   const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
   const deleteTodo = useDeleteTodo();
   const toggleTodo = useToggleTodo();
 
-  const handleToggle = (todo: Todo) => {
-    toggleTodo.mutate(todo);
-  };
-
-  const handleEdit = (todo: Todo) => {
-    setEditingTodo(todo);
-  };
-
-  const handleDelete = (id: string) => {
-    deleteTodo.mutate(id);
-  };
-
   if (todos.length === 0) {
     return (
-      <div className="text-center py-12 text-muted-foreground">
+      <div className="py-12 text-center text-muted-foreground">
         <p className="text-lg">No todos yet</p>
-        <p className="text-sm mt-1">Create your first todo to get started</p>
+        <p className="mt-1 text-sm">Create your first todo to get started</p>
       </div>
     );
   }
@@ -45,13 +39,17 @@ export function TodoList({ todos, selected, onSelect, tags, onAttachTag, onDetac
       <div className="space-y-2">
         {todos.map((todo, index) => (
           <TodoItem
-            key={index}
+            key={todo.id}
             todo={todo}
             index={index}
-            onToggle={handleToggle}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-            selected={selected.has(todo.id)} onSelect={onSelect} tags={tags} onAttachTag={onAttachTag} onDetachTag={onDetachTag}
+            onToggle={(item) => toggleTodo.mutate(item)}
+            onEdit={setEditingTodo}
+            onDelete={(id) => deleteTodo.mutate(id)}
+            selected={selected.has(todo.id)}
+            onSelect={onSelect}
+            tags={tags}
+            onAttachTag={onAttachTag}
+            onDetachTag={onDetachTag}
           />
         ))}
       </div>
@@ -60,7 +58,7 @@ export function TodoList({ todos, selected, onSelect, tags, onAttachTag, onDetac
         <TodoForm
           mode="edit"
           todo={editingTodo}
-          open={!!editingTodo}
+          open
           onClose={() => setEditingTodo(null)}
         />
       )}

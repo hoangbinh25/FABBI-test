@@ -11,9 +11,10 @@ export interface Todo {
   user_id: string;
   created_at: string;
   updated_at: string;
+  tags: { id: string; name: string; color: string | null }[];
 }
 
-interface TodoListResponse {
+export interface TodoListResponse {
   items: Todo[];
   total: number;
   page: number;
@@ -25,6 +26,8 @@ interface CreateTodoRequest {
   description?: string;
 }
 
+export interface TodoFilters { status?: "active" | "completed"; tag_id?: string; keyword?: string; date_from?: string; date_to?: string; }
+
 interface UpdateTodoRequest {
   title?: string;
   description?: string;
@@ -32,15 +35,23 @@ interface UpdateTodoRequest {
 }
 
 
-export function useTodos(page: number = 1, size: number = 10000) {
+export function useTodos(filters: TodoFilters = {}, page: number = 1, size: number = 100) {
   return useQuery({
-    queryKey: ["todos"],
+    queryKey: ["todos", filters, page, size],
     queryFn: async (): Promise<TodoListResponse> => {
       const response = await api.get("/todos", {
-        params: { page, size },
+        params: { ...filters, page, size },
       });
       return response.data;
     },
+  });
+}
+
+export function useBulkStatus() {
+  return useMutation({
+    mutationFn: async ({ ids, completed }: { ids: string[]; completed: boolean }) => (await api.patch("/todos/bulk-status", { todo_ids: ids, completed })).data,
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["todos"] }); toast.success("Todos updated"); },
+    onError: () => toast.error("Failed to update todos"),
   });
 }
 
